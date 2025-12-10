@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flipbook + Música (debuggable)</title>
+  <style>
+    body { margin:0; background:#000; color:#fff; font-family: Arial, sans-serif; }
+    .flip-container { position: relative; padding-top: max(60%, 324px); width:100%; height:0; }
+    .flip-container iframe { position:absolute; border:none; width:100%; height:100%; left:0; top:0; }
+    .music-ui {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      z-index:9999;
+    }
+    .btn {
+      background:#fff; color:#000; padding:10px 14px; border-radius:8px; cursor:pointer;
+      font-weight:700; border:none;
+    }
+    .status {
+      background: rgba(255,255,255,0.06); padding:8px 12px; border-radius:8px; font-size:13px;
+    }
+    /* overlay big play for mobile/demo */
+    .overlay-play {
+      position: fixed;
+      left:50%; top:50%; transform: translate(-50%,-50%);
+      background: rgba(0,0,0,0.6); color:#fff; padding:18px 26px; border-radius:12px;
+      font-size:18px; display:none; z-index:9998; cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="flip-container">
+    <iframe 
+      src="https://online.fliphtml5.com/vzhkn/znzc/"
+      seamless="seamless"
+      scrolling="no"
+      frameborder="0"
+      allowtransparency="true"
+      allowfullscreen="true"
+    ></iframe>
+  </div>
+
+  <!-- Audio: cambiala por tu ruta real. Puede ser 'musica.mp3' o 'https://tusite.com/musica.mp3' -->
+  <audio id="bgAudio" loop preload="auto">
+    <source src="cancion.mp3" type="audio/mpeg">
+    Tu navegador no soporta audio.
+  </audio>
+
+  <!-- UI de control / debug -->
+  <div class="music-ui">
+    <button id="playBtn" class="btn">▶ Reproducir</button>
+    <button id="pauseBtn" class="btn" style="display:none;">⏸ Pausar</button>
+    <div class="status" id="status">Estado: esperando...</div>
+    <!-- Control visible para depurar: muestra controles nativos -->
+    <label style="margin-left:8px">
+      <input id="showControls" type="checkbox"> Mostrar controles
+    </label>
+  </div>
+
+  <div id="overlay" class="overlay-play">Toca para activar sonido</div>
+
+<script>
+  const audio = document.getElementById('bgAudio');
+  const playBtn = document.getElementById('playBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const status = document.getElementById('status');
+  const overlay = document.getElementById('overlay');
+  const showControls = document.getElementById('showControls');
+
+  function setStatus(text) { status.textContent = 'Estado: ' + text; }
+
+  // Intento inicial de autoplay (primero silenciado, para navegadores que permiten autoplay muted)
+  async function tryAutoplay() {
+    try {
+      audio.muted = true;
+      await audio.play();
+      setStatus('reproduciendo (silenciado) — desmutear para escuchar');
+      // si se pudo reproducir silenciado, mostramos overlay para desmutear
+      overlay.style.display = 'block';
+      playBtn.style.display = 'none';
+      pauseBtn.style.display = 'inline-block';
+    } catch (err) {
+      // autoplay falló
+      setStatus('autoplay bloqueado, necesita interacción');
+      overlay.style.display = 'block';
+      playBtn.style.display = 'inline-block';
+      pauseBtn.style.display = 'none';
+    }
+  }
+
+  // try autoplay on load (may fail)
+  window.addEventListener('load', () => {
+    setStatus('intentando autoplay...');
+    tryAutoplay();
+  });
+
+  // Si el usuario hace click en cualquier parte, intentamos reproducir y desmutear
+  function userGesturePlay() {
+    audio.muted = false;
+    audio.play().then(() => {
+      setStatus('reproduciendo');
+      overlay.style.display = 'none';
+      playBtn.style.display = 'none';
+      pauseBtn.style.display = 'inline-block';
+    }).catch(e => {
+      setStatus('no se pudo reproducir tras gesto: ' + (e.message || e));
+    });
+    // quitamos el listener una sola vez
+    window.removeEventListener('click', userGesturePlay);
+  }
+  window.addEventListener('click', userGesturePlay);
+
+  // Botones
+  playBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      await audio.play();
+      audio.muted = false;
+      setStatus('reproduciendo');
+      playBtn.style.display = 'none';
+      pauseBtn.style.display = 'inline-block';
+      overlay.style.display = 'none';
+    } catch (err) {
+      setStatus('no pudo reproducir: ' + (err.message || err));
+    }
+  });
+
+  pauseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    audio.pause();
+    setStatus('pausado');
+    pauseBtn.style.display = 'none';
+    playBtn.style.display = 'inline-block';
+    overlay.style.display = 'block';
+  });
+
+  // overlay click acts as play
+  overlay.addEventListener('click', (e) => {
+    e.stopPropagation();
+    userGesturePlay();
+  });
+
+  // Mostrar controles nativos para debug si lo quieres
+  showControls.addEventListener('change', (e) => {
+    audio.controls = e.target.checked;
+  });
+
+  // Debug: mostrar errores de carga en consola y status
+  audio.addEventListener('error', (ev) => {
+    setStatus('error al cargar audio. Ver consola Network/Console.');
+    console.error('Audio error event:', ev, audio.error);
+  });
+
+  audio.addEventListener('playing', () => setStatus('reproduciendo'));
+  audio.addEventListener('pause', () => setStatus('pausado'));
+</script>
+
+</body>
+</html>
